@@ -23,6 +23,7 @@ import { AmazonQTokenServiceManager } from '../../shared/amazonQServiceManager/A
 import { FileUploadJobManager, FileUploadJobType } from './fileUploadJobManager'
 import { DependencyEventBundler } from './dependency/dependencyEventBundler'
 import ignore = require('ignore')
+import { BUILDER_ID_START_URL, INTERNAL_USER_START_URL } from '../../shared/constants'
 
 const Q_CONTEXT_CONFIGURATION_SECTION = 'aws.q.workspaceContext'
 
@@ -51,6 +52,8 @@ export const WorkspaceContextServer = (): Server => features => {
     let abTestingEnabled = false
     let amazonQServiceManager: AmazonQTokenServiceManager
     let allowedExtension: string[] = ['AmazonQ-For-VSCode', 'Amazon Q For JetBrains']
+    let extensionName: string | undefined
+    let extensionVersion: string | undefined
     let isSupportedExtension = false
 
     lsp.addInitializer((params: InitializeParams) => {
@@ -62,6 +65,13 @@ export const WorkspaceContextServer = (): Server => features => {
             }
         } else {
             isSupportedExtension = true
+        }
+
+        const extension = params.initializationOptions?.aws?.clientInfo?.extension
+        if (extension) {
+            const { name, version } = extension
+            extensionName = name
+            extensionVersion = version
         }
 
         workspaceIdentifier = params.initializationOptions?.aws?.contextConfiguration?.workspaceIdentifier || ''
@@ -140,14 +150,28 @@ export const WorkspaceContextServer = (): Server => features => {
 
     const updateConfiguration = async () => {
         try {
-            let workspaceContextConfig = (await lsp.workspace.getConfiguration('amazonQ.workspaceContext')) || false
-            const configJetBrains = await lsp.workspace.getConfiguration('aws.codeWhisperer')
-            if (configJetBrains) {
-                workspaceContextConfig = workspaceContextConfig || configJetBrains['workspaceContext']
+            let workspaceContextOptIn = (await lsp.workspace.getConfiguration('amazonQ.workspaceContext')) || false
+            if (extensionName === 'Amazon Q For JetBrains') {
+                const configJetBrains = await lsp.workspace.getConfiguration('aws.codeWhisperer')
+                workspaceContextOptIn = configJetBrains?.workspaceContext || false
+            } else if (extensionName === 'AmazonQ-For-VSCode') {
+                // We want these temporary overrides for Amazon internal users and BuilderId users
+                // who are still using old VSCode extension versions, i.e. <= 1.81.0
+                const versionNumer = extensionVersion?.split('-')[0]
+                const isOldVersion =
+                    versionNumer &&
+                    versionNumer.localeCompare('1.81.0', undefined, {
+                        numeric: true,
+                    }) <= 0
+                const startUrl = credentialsProvider.getConnectionMetadata()?.sso?.startUrl
+                const isInternalOrBuilderIdUser =
+                    startUrl && (startUrl.includes(INTERNAL_USER_START_URL) || startUrl.includes(BUILDER_ID_START_URL))
+                if (isOldVersion && isInternalOrBuilderIdUser) {
+                    workspaceContextOptIn = true
+                }
             }
-
-            isOptedIn = workspaceContextConfig === true
-            logging.log(`Workspace context server opt-in flag is: ${workspaceContextConfig}`)
+            logging.log(`Workspace context server opt-in flag is: ${workspaceContextOptIn}`)
+            isOptedIn = workspaceContextOptIn === true
 
             if (!isOptedIn) {
                 isWorkflowInitialized = false
