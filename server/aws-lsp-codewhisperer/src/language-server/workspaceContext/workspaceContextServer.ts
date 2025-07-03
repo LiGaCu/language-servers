@@ -150,13 +150,17 @@ export const WorkspaceContextServer = (): Server => features => {
 
     const updateConfiguration = async () => {
         try {
-            let workspaceContextOptIn = (await lsp.workspace.getConfiguration('amazonQ.workspaceContext')) || false
-            if (extensionName === 'Amazon Q For JetBrains') {
-                const configJetBrains = await lsp.workspace.getConfiguration('aws.codeWhisperer')
-                workspaceContextOptIn = configJetBrains?.workspaceContext || false
-            } else if (extensionName === 'AmazonQ-For-VSCode') {
-                // We want these temporary overrides for Amazon internal users and BuilderId users
-                // who are still using old VSCode extension versions, i.e. <= 1.81.0
+            let workspaceContextOptIn = (await lsp.workspace.getConfiguration('amazonQ.server-sideContext')) || false
+
+            // JetBrains extension configurations are under a different configuration key
+            const configJetBrains = await lsp.workspace.getConfiguration('aws.codeWhisperer')
+            if (configJetBrains) {
+                workspaceContextOptIn = configJetBrains['workspaceContext']
+            }
+
+            // We want this temporary override for Amazon internal users and BuilderId users who are still using
+            // old VSCode extension versions, i.e. <= 1.81.0. Will remove this later.
+            if (extensionName === 'AmazonQ-For-VSCode') {
                 const versionNumer = extensionVersion?.split('-')[0]
                 const isOldVersion =
                     versionNumer &&
@@ -170,6 +174,7 @@ export const WorkspaceContextServer = (): Server => features => {
                     workspaceContextOptIn = true
                 }
             }
+
             logging.log(`Workspace context server opt-in flag is: ${workspaceContextOptIn}`)
             isOptedIn = workspaceContextOptIn === true
 
