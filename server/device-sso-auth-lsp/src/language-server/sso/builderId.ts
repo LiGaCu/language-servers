@@ -33,9 +33,9 @@ export interface SsoAccess {
 export const builderIdStartUrl = 'https://view.awsapps.com/start'
 export const ssoAccountAccessScopes = ['sso:account:access']
 export const codewhispererScopes = [
-    'codewhisperer:completions',
-    'codewhisperer:analysis',
-    'codewhisperer:conversations',
+    'codewhisperer_internal:completions',
+    'codewhisperer_internal:analysis',
+    'codewhisperer_internal:conversations',
 ]
 export const defaultSsoRegion = 'us-east-1'
 const defaultScopes = [...ssoAccountAccessScopes, ...codewhispererScopes]
