@@ -48,6 +48,8 @@ export class JavaDependencyHandler extends LanguageDependencyHandler<JavaDepende
      * - path: the path to the dependency
      */
     initiateDependencyMap(folders: WorkspaceFolder[]): void {
+        this.isDisposed = false
+
         // Filter out the javaDependencyInfos that are in the folders
         const javaDependencyInfoToBeInitiated = this.javaDependencyInfos.filter(javaDependencyInfo => {
             return folders.includes(javaDependencyInfo.workspaceFolder)

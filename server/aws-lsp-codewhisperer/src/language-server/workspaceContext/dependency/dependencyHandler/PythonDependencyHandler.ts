@@ -69,6 +69,8 @@ export class PythonDependencyHandler extends LanguageDependencyHandler<PythonDep
      * - path: the path to the dependency
      */
     initiateDependencyMap(folders: WorkspaceFolder[]): void {
+        this.isDisposed = false
+
         // Filter out the javaDependencyInfos that are in the folders
         const pythonDependencyInfoToBeInitiated = this.pythonDependencyInfos.filter(pythonDependencyInfo => {
             return folders.includes(pythonDependencyInfo.workspaceFolder)

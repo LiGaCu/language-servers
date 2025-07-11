@@ -30,6 +30,7 @@ export abstract class LanguageDependencyHandler<T extends BaseDependencyInfo> {
     protected dependencyUploadedSizeMap = new Map<WorkspaceFolder, number>()
     protected dependencyUploadedSizeSum: Uint32Array<SharedArrayBuffer>
     protected dependencyWatchers: Map<string, DependencyWatcher> = new Map<string, DependencyWatcher>()
+    protected isDisposed: boolean = false
     protected artifactManager: ArtifactManager
     protected dependenciesFolderName: string
     protected readonly MAX_SINGLE_DEPENDENCY_SIZE: number = 500 * 1024 * 1024 // 500 MB
@@ -126,6 +127,9 @@ export abstract class LanguageDependencyHandler<T extends BaseDependencyInfo> {
     async zipDependencyMap(folders: WorkspaceFolder[]): Promise<void> {
         // Process each workspace folder sequentially
         for (const [workspaceFolder, correspondingDependencyMap] of this.dependencyMap) {
+            if (this.isDisposed) {
+                break
+            }
             // Check if the workspace folder is in the provided folders
             if (!folders.includes(workspaceFolder)) {
                 continue
@@ -144,6 +148,9 @@ export abstract class LanguageDependencyHandler<T extends BaseDependencyInfo> {
         let currentChunkSize = 0
         let currentChunk: Dependency[] = []
         for (const dependency of dependencyList) {
+            if (this.isDisposed) {
+                break
+            }
             // If adding this dependency would exceed the chunk size limit,
             // process the current chunk first
             if (currentChunkSize + dependency.size > MAX_CHUNK_SIZE_BYTES && currentChunk.length > 0) {
@@ -310,6 +317,7 @@ export abstract class LanguageDependencyHandler<T extends BaseDependencyInfo> {
         this.dependencyUploadedSizeMap.clear()
         this.dependencyWatchers.forEach(watcher => watcher.dispose())
         this.dependencyWatchers.clear()
+        this.isDisposed = true
     }
 
     disposeWorkspaceFolder(workspaceFolder: WorkspaceFolder): void {

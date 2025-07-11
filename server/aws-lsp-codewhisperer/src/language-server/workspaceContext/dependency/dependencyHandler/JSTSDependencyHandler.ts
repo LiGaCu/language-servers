@@ -53,6 +53,8 @@ export class JSTSDependencyHandler extends LanguageDependencyHandler<JSTSDepende
      * - path: the path to the dependency
      */
     initiateDependencyMap(folders: WorkspaceFolder[]): void {
+        this.isDisposed = false
+
         // Filter out the jstsDependencyInfos that are in the folders
         const jstsDependencyInfoToBeInitiated = this.jstsDependencyInfos.filter(jstsDependencyInfo => {
             return folders.includes(jstsDependencyInfo.workspaceFolder)
