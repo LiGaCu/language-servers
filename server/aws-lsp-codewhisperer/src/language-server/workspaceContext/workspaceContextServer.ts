@@ -205,7 +205,7 @@ export const WorkspaceContextServer = (): Server => features => {
                             feature.variation === 'TREATMENT'
                     ) ?? false
             }
-
+            abTestingEnabled = true
             logging.info(`A/B testing enabled: ${abTestingEnabled}`)
             abTestingEvaluated = true
         } catch (error: any) {
