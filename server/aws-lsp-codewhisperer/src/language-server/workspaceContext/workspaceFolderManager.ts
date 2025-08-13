@@ -6,7 +6,7 @@ import {
     WorkspaceMetadata,
     WorkspaceStatus,
 } from '../../client/token/codewhispererbearertokenclient'
-import { CredentialsProvider, Logging } from '@aws/language-server-runtimes/server-interface'
+import { Agent, CredentialsProvider, Logging, ToolClassification } from '@aws/language-server-runtimes/server-interface'
 import { ArtifactManager, FileMetadata } from './artifactManager'
 import {
     cleanUrl,
@@ -21,17 +21,20 @@ import { URI } from 'vscode-uri'
 import path = require('path')
 import { isAwsError } from '../../shared/utils'
 import { IdleWorkspaceManager } from './IdleWorkspaceManager'
+import { SemanticSearch, SemanticSearchParams } from '../agenticChat/tools/workspaceContext/semanticSearch'
 
 interface WorkspaceState {
     remoteWorkspaceState: WorkspaceStatus
     messageQueue: any[]
     webSocketClient?: WebSocketClient
     workspaceId?: string
+    environmentId?: string
 }
 
 type WorkspaceRoot = string
 
 export class WorkspaceFolderManager {
+    private agent: Agent
     private serviceManager: AmazonQTokenServiceManager
     private logging: Logging
     private artifactManager: ArtifactManager
@@ -59,6 +62,7 @@ export class WorkspaceFolderManager {
     private isArtifactUploadedToRemoteWorkspace: boolean = false
 
     static createInstance(
+        agent: Agent,
         serviceManager: AmazonQTokenServiceManager,
         logging: Logging,
         artifactManager: ArtifactManager,
@@ -69,6 +73,7 @@ export class WorkspaceFolderManager {
     ): WorkspaceFolderManager {
         if (!this.instance) {
             this.instance = new WorkspaceFolderManager(
+                agent,
                 serviceManager,
                 logging,
                 artifactManager,
@@ -86,6 +91,7 @@ export class WorkspaceFolderManager {
     }
 
     private constructor(
+        agent: Agent,
         serviceManager: AmazonQTokenServiceManager,
         logging: Logging,
         artifactManager: ArtifactManager,
@@ -94,6 +100,7 @@ export class WorkspaceFolderManager {
         credentialsProvider: CredentialsProvider,
         workspaceIdentifier: string
     ) {
+        this.agent = agent
         this.serviceManager = serviceManager
         this.logging = logging
         this.artifactManager = artifactManager
@@ -225,6 +232,7 @@ export class WorkspaceFolderManager {
         this.workspaceState.webSocketClient?.destroyClient()
         this.dependencyDiscoverer.dispose()
         this.artifactManager.dispose()
+        this.removeSemanticSearchTool()
     }
 
     /**
@@ -318,6 +326,8 @@ export class WorkspaceFolderManager {
         const webSocketClient = new WebSocketClient(websocketUrl, this.logging, this.credentialsProvider)
         this.workspaceState.remoteWorkspaceState = 'CONNECTED'
         this.workspaceState.webSocketClient = webSocketClient
+        this.workspaceState.environmentId = existingMetadata.environmentId
+        this.registerSemanticSearchTool()
     }
 
     initializeWorkspaceStatusMonitor() {
@@ -633,6 +643,28 @@ export class WorkspaceFolderManager {
         if (this.workspaceState.webSocketClient) {
             this.workspaceState.webSocketClient.destroyClient()
             this.workspaceState.webSocketClient = undefined
+        }
+    }
+
+    private registerSemanticSearchTool() {
+        const existingTool = this.agent.getTools().find(tool => tool.name === SemanticSearch.toolName)
+        if (!existingTool) {
+            const semanticSearchTool = new SemanticSearch(this.logging, this.credentialsProvider)
+            this.agent.addTool(
+                semanticSearchTool.getSpec(),
+                async (input: SemanticSearchParams) => {
+                    await semanticSearchTool.validate(input)
+                    return await semanticSearchTool.invoke(input)
+                },
+                ToolClassification.BuiltIn
+            )
+        }
+    }
+
+    private removeSemanticSearchTool() {
+        const existingTool = this.agent.getTools().find(tool => tool.name === SemanticSearch.toolName)
+        if (existingTool) {
+            this.agent.removeTool(SemanticSearch.toolName)
         }
     }
 
